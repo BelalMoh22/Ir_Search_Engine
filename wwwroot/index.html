@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IR Search Engine — Bilingual Information Retrieval</title>
+    <style>
+        /* === CSS Variables for consistent theming === */
+        :root {
+            --primary: #2563eb; --primary-dark: #1e40af;
+            --success: #10b981; --success-dark: #059669;
+            --warning: #f59e0b; --danger: #ef4444;
+            --bg: #f1f5f9; --surface: #ffffff;
+            --text: #1e293b; --muted: #64748b;
+            --border: #e2e8f0; --radius: 8px;
+        }
+        /* === Reset and base styles === */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); padding: 1.5rem; }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 { color: var(--primary); text-align: center; margin-bottom: 0.25rem; font-size: 1.75rem; }
+        .subtitle { text-align: center; color: var(--muted); margin-bottom: 2rem; font-size: 0.95rem; }
+        /* === Card component === */
+        .card { background: var(--surface); border-radius: var(--radius); box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 1.5rem; margin-bottom: 1.5rem; }
+        .card h2 { color: var(--primary-dark); margin-bottom: 1rem; font-size: 1.2rem; border-bottom: 2px solid var(--border); padding-bottom: 0.5rem; }
+        /* === Form elements === */
+        label { display: block; font-weight: 600; margin-bottom: 0.3rem; font-size: 0.9rem; }
+        input, textarea, select { width: 100%; padding: 0.6rem; border: 1px solid var(--border); border-radius: 4px; font-family: inherit; font-size: 0.95rem; }
+        textarea { resize: vertical; min-height: 80px; }
+        .row { display: flex; gap: 0.75rem; align-items: flex-end; flex-wrap: wrap; }
+        .col { flex: 1; min-width: 150px; }
+        /* === Buttons === */
+        .btn { padding: 0.6rem 1.2rem; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 0.9rem; transition: all 0.2s; color: #fff; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-primary { background: var(--primary); } .btn-primary:hover:not(:disabled) { background: var(--primary-dark); }
+        .btn-success { background: var(--success); } .btn-success:hover:not(:disabled) { background: var(--success-dark); }
+        .btn-outline { background: transparent; color: var(--primary); border: 2px solid var(--primary); }
+        .btn-outline:hover:not(:disabled) { background: var(--primary); color: #fff; }
+        /* === Status messages === */
+        .msg { padding: 0.6rem; border-radius: 4px; margin-top: 0.75rem; font-size: 0.9rem; display: none; }
+        .msg-ok { background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
+        .msg-err { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+        .msg-warn { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+        /* === Token badges === */
+        .tokens { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.5rem; }
+        .token { background: #e0e7ff; color: #3730a3; padding: 0.2rem 0.6rem; border-radius: 99px; font-size: 0.8rem; border: 1px solid #c7d2fe; }
+        /* === Search result items === */
+        .result-item { border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; margin-bottom: 0.75rem; }
+        .result-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
+        .result-score { background: var(--primary); color: #fff; padding: 0.15rem 0.6rem; border-radius: 99px; font-size: 0.8rem; font-weight: 600; }
+        .result-lang { background: #f0fdf4; color: #166534; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.75rem; border: 1px solid #bbf7d0; }
+        .result-snippet { color: var(--muted); font-size: 0.9rem; line-height: 1.5; }
+        /* === Spelling suggestion box === */
+        .suggest { background: #fef3c7; padding: 0.6rem; border-radius: 4px; margin-top: 0.5rem; font-size: 0.9rem; color: #92400e; }
+        /* === Metadata line === */
+        .meta { color: var(--muted); font-size: 0.8rem; margin-top: 0.5rem; }
+        /* === JSON display box === */
+        .json-box { background: #f8fafc; border: 1px solid var(--border); border-radius: 4px; padding: 0.75rem; margin-top: 0.75rem; overflow-x: auto; white-space: pre-wrap; font-family: 'Consolas', monospace; font-size: 0.8rem; max-height: 400px; overflow-y: auto; display: none; }
+        /* === Query type hints === */
+        .query-types { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+        .query-type { background: #f1f5f9; padding: 0.3rem 0.6rem; border-radius: 4px; font-size: 0.75rem; color: var(--muted); border: 1px solid var(--border); }
+        /* === Tab navigation === */
+        .tab-bar { display: flex; gap: 0; margin-bottom: 1rem; border-bottom: 2px solid var(--border); }
+        .tab { padding: 0.5rem 1rem; cursor: pointer; font-weight: 600; font-size: 0.9rem; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -2px; }
+        .tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+        .tab-content { display: none; } .tab-content.active { display: block; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <!-- Page Title -->
+    <h1>IR Search Engine</h1>
+    <p class="subtitle">Bilingual Information Retrieval System — English & Arabic</p>
+
+    <!-- Tab Navigation Bar -->
+    <div class="tab-bar">
+        <div class="tab active" onclick="switchTab('search')">Search</div>
+        <div class="tab" onclick="switchTab('preprocess')">Preprocessing</div>
+        <div class="tab" onclick="switchTab('index')">Index</div>
+    </div>
+
+    <!-- ============ TAB 1: SEARCH ============ -->
+    <div id="tab-search" class="tab-content active">
+        <div class="card">
+            <h2>Search Documents</h2>
+            <!-- Query type hints for the user -->
+            <div class="query-types">
+                <span class="query-type">Normal: machine learning</span>
+                <span class="query-type">Proximity: machine /3 learning</span>
+            </div>
+            <!-- Search input row -->
+            <div class="row" style="margin-bottom:0.75rem;">
+                <div class="col" style="flex:3;">
+                    <label for="searchQuery">Search Query</label>
+                    <input type="text" id="searchQuery" placeholder='Try: machine learning, الذكاء /5 الاصطناعي'>
+                </div>
+                <div class="col" style="flex:1;">
+                    <label for="searchLang">Language</label>
+                    <select id="searchLang">
+                        <option value="">Auto-detect</option>
+                        <option value="en">English</option>
+                        <option value="ar">Arabic</option>
+                    </select>
+                </div>
+                <div class="col" style="flex:0 0 auto;">
+                    <button id="btnSearch" class="btn btn-primary" onclick="doSearch()">Search</button>
+                </div>
+            </div>
+            <!-- Status, suggestions, metadata, and results containers -->
+            <div id="searchMsg" class="msg"></div>
+            <div id="searchSuggest" class="suggest" style="display:none;"></div>
+            <div id="searchMeta" class="meta" style="display:none;"></div>
+            <div id="searchResults"></div>
+        </div>
+
+        <!-- Spelling Correction Section -->
+        <div class="card">
+            <h2>Spelling Correction</h2>
+            <div class="row">
+                <div class="col">
+                    <label for="suggestTerm">Term</label>
+                    <input type="text" id="suggestTerm" placeholder="e.g. machin, lerning">
+                </div>
+                <div class="col" style="flex:0 0 auto;">
+                    <button class="btn btn-outline" onclick="doSuggest()">Suggest</button>
+                </div>
+            </div>
+            <div id="suggestMsg" class="msg"></div>
+        </div>
+    </div>
+
+    <!-- ============ TAB 2: PREPROCESSING ============ -->
+    <div id="tab-preprocess" class="tab-content">
+        <div class="card">
+            <h2>Text Preprocessing Pipeline</h2>
+            <div class="row" style="margin-bottom:0.75rem;">
+                <div class="col">
+                    <label for="prepLang">Language</label>
+                    <select id="prepLang">
+                        <option value="en">English</option>
+                        <option value="ar">Arabic (العربية)</option>
+                    </select>
+                </div>
+            </div>
+            <div style="margin-bottom:0.75rem;">
+                <label for="prepText">Input Text</label>
+                <textarea id="prepText" placeholder="Enter raw text to preprocess..."></textarea>
+            </div>
+            <button class="btn btn-primary" onclick="processText()">Process Text</button>
+            <div id="prepMsg" class="msg"></div>
+            <div id="prepResults" class="json-box"></div>
+        </div>
+    </div>
+
+    <!-- ============ TAB 3: INDEX ============ -->
+    <div id="tab-index" class="tab-content">
+        <div class="card">
+            <h2>Positional Inverted Index</h2>
+            <p style="color:var(--muted);margin-bottom:1rem;font-size:0.9rem;">
+                Build the index from the database. This also builds the K-Gram index for spelling correction.
+            </p>
+            <div class="row">
+                <button id="btnBuild" class="btn btn-success" onclick="buildIndex()">Build Index</button>
+                <button class="btn btn-outline" onclick="viewFullIndex()">View Full Index (JSON)</button>
+            </div>
+            <div id="buildMsg" class="msg"></div>
+            <div id="fullIndex" class="json-box"></div>
+        </div>
+
+        <!-- Term Lookup Section -->
+        <div class="card">
+            <h2>Search Term in Index</h2>
+            <div class="row">
+                <div class="col">
+                    <input type="text" id="termInput" placeholder="Enter a stemmed term (e.g. learn, جامع)">
+                </div>
+                <div class="col" style="flex:0 0 auto;">
+                    <button class="btn btn-primary" onclick="searchTerm()">Lookup Term</button>
+                </div>
+            </div>
+            <div id="termMsg" class="msg"></div>
+            <div id="termResults" class="json-box"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // === TAB SWITCHING LOGIC ===
+    // Switches between Search, Preprocessing, and Index tabs
+    function switchTab(name) {
+        // Remove 'active' class from all tabs and tab contents
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        // Add 'active' class to clicked tab and corresponding content
+        event.target.classList.add('active');
+        document.getElementById('tab-' + name).classList.add('active');
+    }
+
+    // === UTILITY: Show/Hide status messages ===
+    function showMsg(id, text, type) {
+        const el = document.getElementById(id); // Get the message element
+        el.textContent = text;                   // Set the message text
+        el.className = 'msg msg-' + type;        // Set the CSS class (ok/err/warn)
+        el.style.display = 'block';              // Make it visible
+    }
+    function hideMsg(id) {
+        document.getElementById(id).style.display = 'none'; // Hide the message
+    }
+
+    // === SEARCH FUNCTIONALITY ===
+    // Sends query to POST /api/search/query and displays ranked results
+    async function doSearch() {
+        // Get input values from the form
+        const query = document.getElementById('searchQuery').value.trim(); // User's query
+        const lang = document.getElementById('searchLang').value;          // Selected language
+
+        // Validate input
+        if (!query) { showMsg('searchMsg', 'Please enter a query.', 'err'); return; }
+
+        // Reset UI elements before new search
+        hideMsg('searchMsg');                                              // Hide previous errors
+        document.getElementById('searchSuggest').style.display = 'none'; // Hide previous suggestions
+        document.getElementById('searchMeta').style.display = 'none';    // Hide previous metadata
+        document.getElementById('searchResults').innerHTML = '';           // Clear previous results
+        document.getElementById('btnSearch').disabled = true;             // Disable button during request
+
+        try {
+            // Send POST request to the search API
+            const res = await fetch('/api/search/query', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ query, language: lang || null }) // Send query and optional language
+            });
+
+            const data = await res.json(); // Parse JSON response
+            if (!res.ok) throw new Error(data.error || 'Search failed.'); // Handle HTTP errors
+
+            // Display query metadata (type, processed terms, result count)
+            const meta = document.getElementById('searchMeta');
+            meta.innerHTML = `Query Type: <b>${data.queryType}</b> | ` +
+                `Processed Terms: <b>${data.processedTerms.join(', ')}</b> | ` +
+                `Results: <b>${data.totalResults}</b>`;
+            meta.style.display = 'block'; // Show metadata
+
+            // Display spelling suggestions if any terms were not found
+            if (data.suggestions && Object.keys(data.suggestions).length > 0) {
+                const sg = document.getElementById('searchSuggest');
+                let html = '💡 Did you mean: '; // Start suggestion message
+                // Iterate through each term with suggestions
+                for (const [term, sugs] of Object.entries(data.suggestions)) {
+                    html += `<b>${sugs.join(', ')}</b> (for "${term}") `;
+                }
+                sg.innerHTML = html;           // Set suggestion HTML
+                sg.style.display = 'block';    // Show suggestion box
+            }
+
+            // Display ranked search results
+            const container = document.getElementById('searchResults');
+            if (data.results.length === 0) {
+                // No results found
+                container.innerHTML = '<p style="color:var(--muted);margin-top:1rem;">No results found.</p>';
+            } else {
+                // Render each result as a card with score and snippet
+                data.results.forEach(r => {
+                    container.innerHTML += `
+                    <div class="result-item">
+                        <div class="result-header">
+                            <span>Doc #${r.documentId}
+                                <span class="result-lang">${r.language === 'en' ? 'English' : 'Arabic'}</span>
+                            </span>
+                            <span class="result-score">Score: ${r.score.toFixed(4)}</span>
+                        </div>
+                        <div class="result-snippet">${r.snippet}</div>
+                    </div>`;
+                });
+            }
+        } catch (e) {
+            showMsg('searchMsg', e.message, 'err'); // Show error message
+        } finally {
+            document.getElementById('btnSearch').disabled = false; // Re-enable search button
+        }
+    }
+
+    // === SPELLING CORRECTION ===
+    // Sends term to GET /api/search/suggest and displays suggestions
+    async function doSuggest() {
+        const term = document.getElementById('suggestTerm').value.trim(); // Get the term
+        if (!term) { showMsg('suggestMsg', 'Enter a term.', 'err'); return; } // Validate
+        try {
+            // Send GET request to the suggest API
+            const res = await fetch(`/api/search/suggest?term=${encodeURIComponent(term)}`);
+            const data = await res.json();        // Parse response
+            if (!res.ok) throw new Error(data.error); // Handle errors
+            // Show the suggestion message (warn if suggestions found, ok if none)
+            showMsg('suggestMsg', data.message, data.suggestions.length > 0 ? 'warn' : 'ok');
+        } catch (e) {
+            showMsg('suggestMsg', e.message, 'err'); // Show error
+        }
+    }
+
+    // === TEXT PREPROCESSING ===
+    // Sends text to POST /api/search/process and displays tokens
+    async function processText() {
+        const text = document.getElementById('prepText').value;    // Get input text
+        const lang = document.getElementById('prepLang').value;    // Get selected language
+        if (!text.trim()) { showMsg('prepMsg', 'Enter text.', 'err'); return; } // Validate
+        hideMsg('prepMsg'); // Hide previous messages
+        try {
+            // Send POST request to the process API
+            const res = await fetch('/api/search/process', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ text, language: lang }) // Send text and language
+            });
+            const data = await res.json();        // Parse response
+            if (!res.ok) throw new Error(data.error); // Handle errors
+            // Display processed tokens as colored badges
+            const el = document.getElementById('prepResults');
+            let html = `<div style="margin-bottom:8px;color:var(--muted);">Tokens: ${data.tokenCount}</div>`;
+            html += '<div class="tokens">';
+            data.tokens.forEach(t => { html += `<span class="token">${t}</span>`; }); // Add each token
+            html += '</div>';
+            el.innerHTML = html;           // Set the HTML
+            el.style.display = 'block';    // Show the results box
+        } catch (e) {
+            showMsg('prepMsg', e.message, 'err'); // Show error
+        }
+    }
+
+    // === BUILD INDEX ===
+    // Sends POST to /api/index/build to build inverted + k-gram index
+    async function buildIndex() {
+        const btn = document.getElementById('btnBuild'); // Get build button
+        btn.disabled = true;                              // Disable during build
+        btn.textContent = 'Building...';                  // Update button text
+        hideMsg('buildMsg');                               // Hide previous messages
+        try {
+            // Send POST request to build the index
+            const res = await fetch('/api/index/build', { method: 'POST' });
+            const data = await res.json();                // Parse response
+            if (!res.ok) throw new Error(data.error || data.message); // Handle errors
+            // Show success message with stats
+            showMsg('buildMsg',
+                `✅ Indexed ${data.totalDocumentsIndexed} docs, ` +
+                `${data.totalTermsIndexed} terms, ` +
+                `${data.totalKGrams} k-grams`, 'ok');
+        } catch (e) {
+            showMsg('buildMsg', e.message, 'err'); // Show error
+        } finally {
+            btn.disabled = false;                  // Re-enable button
+            btn.textContent = 'Build Index';       // Reset button text
+        }
+    }
+
+    // === VIEW FULL INDEX JSON ===
+    // Fetches GET /api/index and displays the raw JSON
+    async function viewFullIndex() {
+        const el = document.getElementById('fullIndex'); // Get display element
+        el.textContent = 'Loading...';                    // Show loading message
+        el.style.display = 'block';                       // Make visible
+        try {
+            const res = await fetch('/api/index');         // Fetch full index
+            const data = await res.json();                 // Parse JSON
+            el.textContent = JSON.stringify(data, null, 2); // Pretty-print JSON
+        } catch (e) {
+            el.textContent = 'Error: ' + e.message;       // Show error in box
+        }
+    }
+
+    // === TERM LOOKUP ===
+    // Fetches GET /api/index/term/{term} and displays postings
+    async function searchTerm() {
+        const term = document.getElementById('termInput').value.trim(); // Get the term
+        if (!term) { showMsg('termMsg', 'Enter a term.', 'err'); return; } // Validate
+        hideMsg('termMsg');                                                  // Hide previous messages
+        const el = document.getElementById('termResults');                   // Get results element
+        try {
+            // Fetch term postings from the API
+            const res = await fetch(`/api/index/term/${encodeURIComponent(term)}`);
+            const data = await res.json();        // Parse response
+            if (!res.ok) throw new Error(data.error); // Handle errors
+            // Format output: Term → Doc ID → [positions]
+            let out = `Term: ${data.term}\n\n`;
+            for (const [docId, pos] of Object.entries(data.documents)) {
+                out += `Doc ${docId} → [${pos.join(', ')}]\n`; // List each document's positions
+            }
+            el.textContent = out;              // Set the formatted text
+            el.style.display = 'block';        // Show the results box
+        } catch (e) {
+            showMsg('termMsg', e.message, 'err'); // Show error
+        }
+    }
+
+    // === KEYBOARD SHORTCUT ===
+    // Allow pressing Enter in the search input to trigger search
+    document.getElementById('searchQuery').addEventListener('keypress', e => {
+        if (e.key === 'Enter') doSearch(); // Trigger search on Enter key
+    });
+</script>
+</body>
+</html>

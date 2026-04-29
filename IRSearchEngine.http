@@ -1,0 +1,6 @@
+@IRSearchEngine_HostAddress = http://localhost:5182
+
+GET {{IRSearchEngine_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
