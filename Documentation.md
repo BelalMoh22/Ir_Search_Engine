@@ -1,4 +1,4 @@
-# IR Search Engine — Project Documentation
+# IR Search Engine — Project Documentation & Audit
 
 ## Bilingual Information Retrieval System (English + Arabic)
 
@@ -299,37 +299,40 @@ For each test query:
 4. Calculate Recall = relevant_retrieved / total_relevant_in_collection
 
 
-Presicion and Recall :
+## 9. Requirement Satisfaction & Code Mapping
 
-simple example from your project.
-Imagine you search for "machine learning".
+This section maps the specific requirements from the project specification (**Ir Project.pdf**) to the implementation in the codebase.
 
-Before you look at the results, you look at your Database (SeedData.sql) and you see there are exactly 6 documents about AI and Machine Learning in the whole system. (Let's call these the "Good" documents).
+### ✅ Satisfied Requirements
 
-1. Precision (Accuracy of the results you see)
-Question: "Out of all the results shown on my screen, how many are actually good?"
+| Requirement | Code Location | Implementation Detail |
+| :--- | :--- | :--- |
+| **1. Bilingual Support** | `TextProcessorService.cs` | Automatically detects English/Arabic and routes text to the correct pipeline using regex. |
+| **2. Document Corpus** | `SeedData.sql` | Contains 10 English and 10 Arabic documents (15,000+ words) loaded into SQL Server. |
+| **3. English Pipeline** | `EnglishProcessor.cs` | Implements Tokenization, Stop-word removal, and the **Porter Stemmer** algorithm. |
+| **4. Arabic Pipeline** | `ArabicProcessor.cs` | Implements Normalization (أ/إ/آ → ا), Tashkeel removal, and **Light Stemming** (prefix/suffix removal). |
+| **5. Positional Inverted Index** | `InvertedIndexService.cs` | Uses a nested dictionary `Dictionary<string, Dictionary<int, List<int>>>` to store Term → DocID → List of Positions. |
+| **6. Proximity Search (/k)** | `QueryProcessorService.cs` | Parses the `/k` operator and checks the positional index to ensure terms are within the specified distance. |
+| **7. TF-IDF Weighting** | `RankingService.cs` | Calculates logarithmic TF (`1 + log10(tf)`) and IDF (`log10(N/df)`). |
+| **8. Vector Space Model** | `RankingService.cs` | Implements **Cosine Similarity** to calculate the angle between query and document vectors. |
+| **9. Spelling Correction** | `SpellingCorrectionService.cs` | Uses **Levenshtein (Edit) Distance** combined with **Jaccard Similarity** from the K-Gram index. |
+| **10. K-Gram Index** | `KGramIndexService.cs` | Generates 2-grams (bigrams) for the entire vocabulary to support spelling suggestions. |
+| **11. Precision & Recall** | `Documentation.md` | Provides the mathematical formulas and testing methodology for manual evaluation. |
 
-You search: machine learning
-The system returns: 8 results total.
-You check them: You see that 5 of them are actually about ML, but 3 are just random.
-Calculation: 5 (Good results) ÷ 8 (Total results shown) = 0.625
-Result: 62.5% Precision
-2. Recall (How much of the database you found)
-Question: "Out of all the 'Good' documents in the whole database, how many did the search engine find?"
+---
 
-Total Good documents in Database: 6
-How many you found: 5
-Calculation: 5 (Good results found) ÷ 6 (Total Good docs in DB) = 0.833
-Result: 83.3% Recall
-🟢 How to do it for your report:
-Pick a query, for example: "الذكاء الاصطناعي" (Arabic AI).
-Count how many documents in your SeedData.sql are actually about Arabic AI. (Let's say it is 4).
-Run the search in the app.
-Count how many results the app gave you. (Let's say it gave you 5 results).
-Check if all 5 are relevant. (Maybe only 4 are good).
-Precision: 4 ÷ 5 = 80%
-Recall: 4 ÷ 4 = 100% (You found all of them!)
-Summary:
+## 10. Missing or Ignored Requirements
 
-Precision = Quality of the results on the screen.
-Recall = Completeness of the search.
+The following requirements from the project specification were **not fully implemented** or were skipped in the current version of the search engine:
+
+1.  **Phrase Queries**:
+    *   **Status:** Missing.
+    *   **Reason:** The system uses "AND" logic for multi-word queries. While it finds documents containing all words, it does not strictly enforce that they must appear in the exact sequence (e.g., "machine learning" as a fixed phrase).
+2.  **Wildcard Queries**:
+    *   **Status:** Partially Implemented (Logic only).
+    *   **Reason:** While `KGramIndexService.cs` contains the code to expand wildcards (like `comput*`), this feature is **not integrated** into the main `QueryProcessorService` or the search UI.
+3.  **Speed Evaluation**:
+    *   **Status:** Missing.
+    *   **Reason:** The project requires recording the time taken to build the index versus retrieval time. There is no code in the backend or frontend that measures or displays these timings.
+
+---
